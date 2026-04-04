@@ -15,6 +15,3 @@ The coarse_prompt array is an intermediate output of the text-to-speech pipeline
 The fine_prompt array is a further processed output of the pipeline, and contains 8 codebooks from the EnCodec Codec. These codebooks represent the final stage of tokenization, and the resulting tokens are used to generate the audio output. The shape of this array is (8, p), where p is the number of tokens after further processing by the EnCodec Codec.
 
 Overall, these arrays represent different stages of a text-to-speech pipeline that converts text input into synthesized audio output. The semantic_prompt array represents the input text, while coarse_prompt and fine_prompt represent intermediate and final stages of tokenization, respectively.
-
-
-

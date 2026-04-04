@@ -2,14 +2,15 @@
 Much of this code is adapted from Andrej Karpathy's NanoGPT
 (https://github.com/karpathy/nanoGPT)
 """
-from dataclasses import dataclass
+
 import math
+from dataclasses import dataclass
 
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-from .model import GPT, GPTConfig, MLP
+from .model import GPT, MLP, GPTConfig
 
 
 class NonCausalSelfAttention(nn.Module):
@@ -147,3 +148,4 @@ class FineGPT(GPT):
 class FineGPTConfig(GPTConfig):
     n_codes_total: int = 8
     n_codes_given: int = 1
+

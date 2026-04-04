@@ -1,32 +1,33 @@
 import contextlib
 import gc
 import hashlib
+import logging
 import os
 import re
-import requests
 
-from encodec import EncodecModel
 import funcy
-import logging
 import numpy as np
-from scipy.special import softmax
+import requests
 import torch
 import torch.nn.functional as F
 import tqdm
+from encodec import EncodecModel
+from scipy.special import softmax
 from transformers import BertTokenizer
 
-from .model import GPTConfig, GPT
+from .model import GPT, GPTConfig
 from .model_fine import FineGPT, FineGPTConfig
 
 if (
-    torch.cuda.is_available() and
-    hasattr(torch.cuda, "amp") and
-    hasattr(torch.cuda.amp, "autocast") and
-    hasattr(torch.cuda, "is_bf16_supported") and
-    torch.cuda.is_bf16_supported()
+    torch.cuda.is_available()
+    and hasattr(torch.cuda, "amp")
+    and hasattr(torch.cuda.amp, "autocast")
+    and hasattr(torch.cuda, "is_bf16_supported")
+    and torch.cuda.is_bf16_supported()
 ):
     autocast = funcy.partial(torch.cuda.amp.autocast, dtype=torch.bfloat16)
 else:
+
     @contextlib.contextmanager
     def autocast():
         yield
@@ -114,10 +115,10 @@ REMOTE_MODEL_PATHS = {
 }
 
 
-if not hasattr(torch.nn.functional, 'scaled_dot_product_attention'):
+if not hasattr(torch.nn.functional, "scaled_dot_product_attention"):
     logger.warning(
-        "torch version does not support flash attention. You will get significantly faster" +
-        " inference speed by upgrade torch to newest version / nightly."
+        "torch version does not support flash attention. You will get significantly faster"
+        + " inference speed by upgrade torch to newest version / nightly."
     )
 
 
@@ -222,10 +223,7 @@ def _load_model(ckpt_path, device, use_small=False, model_type="text"):
         raise NotImplementedError()
     model_key = f"{model_type}_small" if use_small or USE_SMALL_MODELS else model_type
     model_info = REMOTE_MODEL_PATHS[model_key]
-    if (
-        os.path.exists(ckpt_path) and
-        _md5(ckpt_path) != model_info["checksum"]
-    ):
+    if os.path.exists(ckpt_path) and _md5(ckpt_path) != model_info["checksum"]:
         logger.warning(f"found outdated {model_type} model, removing.")
         os.remove(ckpt_path)
     if not os.path.exists(ckpt_path):
@@ -304,7 +302,7 @@ def load_codec_model(use_gpu=True, force_reload=False):
         device = "cpu"
     else:
         device = "cuda"
-    model_key = str(device) + f"__codec"
+    model_key = str(device) + "__codec"
     if model_key not in models or force_reload:
         clean_models(model_key=model_key)
         model = _load_codec_model(device)
@@ -372,7 +370,7 @@ def generate_text_semantic(
     max_gen_duration_s=None,
     allow_early_stop=True,
     model=None,
-    use_kv_caching=False
+    use_kv_caching=False,
 ):
     """Generate semantic tokens from text."""
     assert isinstance(text, str)
@@ -382,7 +380,7 @@ def generate_text_semantic(
         if history_prompt.endswith(".npz"):
             semantic_history = np.load(history_prompt)["semantic_prompt"]
         else:
-            assert (history_prompt in ALLOWED_PROMPTS)
+            assert history_prompt in ALLOWED_PROMPTS
             semantic_history = np.load(
                 os.path.join(CUR_PATH, "assets", "prompts", f"{history_prompt}.npz")
             )["semantic_prompt"]
@@ -424,7 +422,9 @@ def generate_text_semantic(
     else:
         semantic_history = np.array([SEMANTIC_PAD_TOKEN] * 256)
     x = torch.from_numpy(
-        np.hstack([encoded_text, semantic_history, np.array([SEMANTIC_INFER_TOKEN])]).astype(np.int64)
+        np.hstack([encoded_text, semantic_history, np.array([SEMANTIC_INFER_TOKEN])]).astype(
+            np.int64
+        )
     )[None]
     assert x.shape[1] == 256 + 256 + 1
     with _inference_mode():
@@ -441,7 +441,9 @@ def generate_text_semantic(
             else:
                 x_input = x
 
-            logits, kv_cache = model(x_input, merge_context=True, use_cache=use_kv_caching, past_kv=kv_cache)
+            logits, kv_cache = model(
+                x_input, merge_context=True, use_cache=use_kv_caching, past_kv=kv_cache
+            )
             relevant_logits = logits[0, 0, :SEMANTIC_VOCAB_SIZE]
             if allow_early_stop:
                 relevant_logits = torch.hstack(
@@ -518,7 +520,7 @@ def generate_coarse(
     max_coarse_history=630,  # min 60 (faster), max 630 (more context)
     sliding_window_len=60,
     model=None,
-    use_kv_caching=False
+    use_kv_caching=False,
 ):
     """Generate coarse audio codes from semantic tokens."""
     assert (
@@ -536,7 +538,7 @@ def generate_coarse(
         if history_prompt.endswith(".npz"):
             x_history = np.load(history_prompt)
         else:
-            assert (history_prompt in ALLOWED_PROMPTS)
+            assert history_prompt in ALLOWED_PROMPTS
             x_history = np.load(
                 os.path.join(CUR_PATH, "assets", "prompts", f"{history_prompt}.npz")
             )
@@ -625,12 +627,8 @@ def generate_coarse(
                     x_input = x_in
 
                 logits, kv_cache = model(x_input, use_cache=use_kv_caching, past_kv=kv_cache)
-                logit_start_idx = (
-                    SEMANTIC_VOCAB_SIZE + (1 - int(is_major_step)) * CODEBOOK_SIZE
-                )
-                logit_end_idx = (
-                    SEMANTIC_VOCAB_SIZE + (2 - int(is_major_step)) * CODEBOOK_SIZE
-                )
+                logit_start_idx = SEMANTIC_VOCAB_SIZE + (1 - int(is_major_step)) * CODEBOOK_SIZE
+                logit_end_idx = SEMANTIC_VOCAB_SIZE + (2 - int(is_major_step)) * CODEBOOK_SIZE
                 relevant_logits = logits[0, 0, logit_start_idx:logit_end_idx]
                 if top_p is not None:
                     # faster to convert to numpy
@@ -689,7 +687,7 @@ def generate_fine(
         if history_prompt.endswith(".npz"):
             x_fine_history = np.load(history_prompt)["fine_prompt"]
         else:
-            assert (history_prompt in ALLOWED_PROMPTS)
+            assert history_prompt in ALLOWED_PROMPTS
             x_fine_history = np.load(
                 os.path.join(CUR_PATH, "assets", "prompts", f"{history_prompt}.npz")
             )["fine_prompt"]
@@ -764,9 +762,9 @@ def generate_fine(
                 del logits, codebook_preds
             # transfer over info into model_in and convert to numpy
             for nn in range(n_coarse, N_FINE_CODEBOOKS):
-                in_arr[
-                    start_fill_idx : start_fill_idx + (1024 - rel_start_fill_idx), nn
-                ] = in_buffer[0, rel_start_fill_idx:, nn]
+                in_arr[start_fill_idx : start_fill_idx + (1024 - rel_start_fill_idx), nn] = (
+                    in_buffer[0, rel_start_fill_idx:, nn]
+                )
             del in_buffer
         gen_fine_arr = in_arr.detach().cpu().numpy().squeeze().T
         del in_arr
@@ -791,3 +789,4 @@ def codec_decode(fine_tokens, model=None, use_gpu=True):
     audio_arr = out.detach().cpu().numpy().squeeze()
     del arr, emb, out
     return audio_arr
+

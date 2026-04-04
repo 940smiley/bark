@@ -2,7 +2,8 @@ from typing import Optional
 
 import numpy as np
 
-from .generation import codec_decode, generate_coarse, generate_fine, generate_text_semantic
+from .generation import (codec_decode, generate_coarse, generate_fine,
+                         generate_text_semantic)
 
 
 def text_to_semantic(
@@ -23,11 +24,7 @@ def text_to_semantic(
         numpy semantic array to be fed into `semantic_to_waveform`
     """
     x_semantic = generate_text_semantic(
-        text,
-        history_prompt=history_prompt,
-        temp=temp,
-        silent=silent,
-        use_kv_caching=True
+        text, history_prompt=history_prompt, temp=temp, silent=silent, use_kv_caching=True
     )
     return x_semantic
 
@@ -56,7 +53,7 @@ def semantic_to_waveform(
         history_prompt=history_prompt,
         temp=temp,
         silent=silent,
-        use_kv_caching=True
+        use_kv_caching=True,
     )
     fine_tokens = generate_fine(
         coarse_tokens,
@@ -75,11 +72,11 @@ def semantic_to_waveform(
 
 
 def save_as_prompt(filepath, full_generation):
-    assert(filepath.endswith(".npz"))
-    assert(isinstance(full_generation, dict))
-    assert("semantic_prompt" in full_generation)
-    assert("coarse_prompt" in full_generation)
-    assert("fine_prompt" in full_generation)
+    assert filepath.endswith(".npz")
+    assert isinstance(full_generation, dict)
+    assert "semantic_prompt" in full_generation
+    assert "coarse_prompt" in full_generation
+    assert "fine_prompt" in full_generation
     np.savez(filepath, **full_generation)
 
 
@@ -123,3 +120,4 @@ def generate_audio(
     else:
         audio_arr = out
     return audio_arr
+
